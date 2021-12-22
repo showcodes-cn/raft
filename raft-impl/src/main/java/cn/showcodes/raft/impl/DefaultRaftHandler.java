@@ -8,15 +8,14 @@ import cn.showcodes.raft.impl.frame.BecomeLeader;
 
 public class DefaultRaftHandler implements RaftHandler{
     RaftFSM raftFSM;
-    RaftFrameService raftFrameService;
 
     DefaultRaftHandler(RaftFSM raftFSM) {
         this.raftFSM = raftFSM;
-        raftFrameService = raftFSM.raftFrameService;
     }
 
     @Override
     public void handle(RaftRequest transition, RaftHandleContext context) {
+        RaftFrameService raftFrameService = raftFSM.raftFrameService;
         switch (transition.getFrame().getType()) {
             case voteRequest:
                 raftFSM.handleVoteRequest(transition.getCommunicationNode(), raftFrameService.voteRequest(transition.getFrame()), context);

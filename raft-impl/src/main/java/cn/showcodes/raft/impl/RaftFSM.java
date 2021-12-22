@@ -225,6 +225,7 @@ public class RaftFSM implements FiniteStateMachine<RaftRequest> {
                 Map<String, Object> attributes = new HashMap<>();
                 attributes.put("role", RaftRole.leader);
                 attributes.put("roleData", becomeLeader);
+                frame.setAttributes(attributes);
                 handleContext.fireRequest(frame);
                 log.info("receive accept response from {}", node);
             } else {

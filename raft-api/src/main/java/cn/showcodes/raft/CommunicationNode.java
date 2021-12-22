@@ -13,4 +13,9 @@ public class CommunicationNode {
         this.host = host;
         this.port = port;
     }
+
+    @Override
+    public String toString() {
+        return String.format("%s:%d", host, port);
+    }
 }

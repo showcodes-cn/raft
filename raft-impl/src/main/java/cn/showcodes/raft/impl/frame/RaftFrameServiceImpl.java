@@ -24,31 +24,44 @@ public class RaftFrameServiceImpl implements RaftFrameService {
 
     @Override
     public RaftFrameVoteResponse voteResponse(RaftFrame frame) {
-        return null;
+        return RaftFrameVoteResponse.from(frame.getData());
     }
 
     @Override
     public RaftFrame from(RaftFrameVoteResponse response) {
-        return null;
+        RaftFrame frame = new RaftFrame();
+        frame.setType(RaftFrameType.voteResponse);
+        frame.setData(response.toBytes());
+        return frame;
     }
 
     @Override
     public RaftFrameAppendEntriesRequest appendEntriesRequest(RaftFrame frame) {
-        return null;
+        RaftFrameAppendEntriesRequest request = new RaftFrameAppendEntriesRequest();
+        request.from(frame.getData());
+        return request;
     }
 
     @Override
     public RaftFrame from(RaftFrameAppendEntriesRequest request) {
-        return null;
+        RaftFrame frame = new RaftFrame();
+        frame.setType(RaftFrameType.appendEntriesRequest);
+        frame.setData(request.toBytes());
+        return frame;
     }
 
     @Override
     public RaftFrameAppendEntriesResponse appendEntriesResponse(RaftFrame frame) {
-        return null;
+        RaftFrameAppendEntriesResponse response = new RaftFrameAppendEntriesResponse();
+        response.from(frame.getData());
+        return response;
     }
 
     @Override
     public RaftFrame from(RaftFrameAppendEntriesResponse response) {
-        return null;
+        RaftFrame frame = new RaftFrame();
+        frame.setType(RaftFrameType.appendEntriesResponse);
+        frame.setData(response.toBytes());
+        return frame;
     }
 }
