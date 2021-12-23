@@ -8,4 +8,7 @@ public interface RaftLogService {
     RaftLog commit(RaftLog logItem);
     long getCommitIndex();
     long commitTo(long leaderCommit);
+    RaftLog lastAvailableItem();
+    RaftLog lastCommitItem();
+    int removeTo(RaftLog raftLog);
 }

@@ -74,7 +74,7 @@ public class RaftFSMTest {
     public void testLeaderWin() throws InterruptedException {
         RaftFSM raftFSM = testFSM();
         RaftRequestSupplier supplier = raftFSM.requestSupplier;
-        CountDownLatch countDownLatch = new CountDownLatch(1);
+        CountDownLatch countDownLatch = new CountDownLatch(3);
 
         FakeCommunicationService fakeCommunicationService = (FakeCommunicationService)raftFSM.communicationService;
 
@@ -105,6 +105,15 @@ public class RaftFSMTest {
             supplier.append(voteResponseRequest);
         }
 
+        for( ; ;) {
+            RaftFrame frame = (RaftFrame) fakeCommunicationService.outgoing.take();
+            if (frame.getType() == RaftFrameType.appendEntriesRequest) {
+                countDownLatch.countDown();
+                if (countDownLatch.getCount() == 0 ) {
+                    break;
+                }
+            }
+        }
         countDownLatch.await();
 
     }

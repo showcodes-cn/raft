@@ -172,7 +172,8 @@ public class RaftFSM implements FiniteStateMachine<RaftRequest> {
             FollowerRef followerRef = new FollowerRef();
             followerRef.communicationNode = node;
             followerRef.createTime = System.currentTimeMillis();
-            followerRef.nextIndex = lastLogIndex + 1;
+            RaftLog last = raftLogService.lastAvailableItem();
+            followerRef.nextIndex = last.getIndex();
             return followerRef;
         });
 
@@ -264,8 +265,15 @@ public class RaftFSM implements FiniteStateMachine<RaftRequest> {
         RaftFrameVoteRequest voteRequest = new RaftFrameVoteRequest();
         voteRequest.setCandidateId(votedFor);
         voteRequest.setTerm(currentTerm);
-        voteRequest.setLastLogIndex(0);
-        voteRequest.setLastLogTerm(0);
+        RaftLog lastCommit = raftLogService.lastCommitItem();
+        if (lastCommit != null) {
+            voteRequest.setLastLogIndex(lastCommit.getIndex());
+            voteRequest.setLastLogTerm(lastCommit.getTerm());
+        } else {
+            voteRequest.setLastLogTerm(0);
+            voteRequest.setLastLogIndex(0);
+        }
+
 
         stateLock.writeLock().unlock();
         RaftFrame data = raftFrameService.from(voteRequest);
@@ -292,17 +300,7 @@ public class RaftFSM implements FiniteStateMachine<RaftRequest> {
         );
         stateLock.writeLock().unlock();
 
-        RaftFrameAppendEntriesRequest appendEntriesRequest = new RaftFrameAppendEntriesRequest();
-        appendEntriesRequest.setLeaderId(leaderId);
-        appendEntriesRequest.setTerm(currentTerm);
-//        todo: add previous log info
-//        appendEntriesRequest.setCommitIndex();
-        RaftLog raftLog = new RaftLog();
-        raftLog.setTerm(currentTerm);
-        raftLog.setType(RaftLogType.leader);
-        appendEntriesRequest.setEntries(new RaftLog[] { raftLog });
-
-        handleContext.fireRequest(raftFrameService.from(appendEntriesRequest));
+        raftLogService.append(RaftLogType.leader, currentTerm, null);
         this.leading();
     }
 
@@ -311,8 +309,14 @@ public class RaftFSM implements FiniteStateMachine<RaftRequest> {
             log.info("has vote to {} in term={}, ignore {}", votedFor, lastVoteTerm, request.getCandidateId());
             return;
         }
+        RaftLog lastCommit = raftLogService.lastCommitItem();
+        if (lastCommit == null) {
+            lastCommit = new RaftLog();
+            lastCommit.setTerm(0);
+            lastCommit.setIndex(0);
+        }
         RaftFrameVoteResponse response = new RaftFrameVoteResponse();
-        if (request.getTerm() > currentTerm && request.getLastLogIndex() >= raftLogService.getCommitIndex()) {
+        if (request.getTerm() > currentTerm && request.getLastLogIndex() >= lastCommit.getIndex() && request.getLastLogTerm() >= lastCommit.getTerm()) {
 
             BecomeFollower becomeFollower = new BecomeFollower();
             becomeFollower.setLeaderId(request.getCandidateId());
@@ -409,32 +413,44 @@ public class RaftFSM implements FiniteStateMachine<RaftRequest> {
             response.setTerm(currentTerm);
             handleContext.sendResponse(raftFrameService.from(response));
         } else {
-            if (request.getPrevLogIndex() >  0) {
+
+            if (request.getPrevLogTerm() > 0) {
                 RaftLog previous = raftLogService.get(request.getPrevLogIndex());
-                if (previous.getTerm() != request.getPrevLogTerm()) {
+                // 当前节点不存在服务器发过来的commit位置，需要找更早的数据
+                if (previous == null) {
                     RaftFrameAppendEntriesResponse response = new RaftFrameAppendEntriesResponse();
                     response.setSuccess(false);
                     response.setTerm(currentTerm);
                     handleContext.sendResponse(raftFrameService.from(response));
                     return;
+                } else {
+                    // 数据冲突
+                    if (previous.getTerm() != request.getTerm()) {
+                        RaftFrameAppendEntriesResponse response = new RaftFrameAppendEntriesResponse();
+                        response.setSuccess(false);
+                        response.setTerm(currentTerm);
+                        handleContext.sendResponse(raftFrameService.from(response));
+                        raftLogService.removeTo(previous);
+                        return;
+                    }
+
+                    raftLogService.removeTo(previous);
                 }
             }
+
+
             RaftLog[] items = request.getEntries();
             RaftLog last = null;
             if (items != null && items.length > 0) {
                 for(RaftLog item : items) {
-                    raftLogService.append(item);
+                    last = raftLogService.append(item);
                 }
-                last = items[items.length - 1];
             }
             raftLogService.commitTo(request.getCommitIndex());
             RaftFrameAppendEntriesResponse response = new RaftFrameAppendEntriesResponse();
             response.setTerm(currentTerm);
             response.setSuccess(true);
-            if (last != null) {
-                response.setLastLogIndex(last.getIndex());
-                response.setLastCommitIndex(raftLogService.getCommitIndex());
-            }
+            response.setLastIndex(last.getIndex());
             handleContext.sendResponse(raftFrameService.from(response));
         }
 
@@ -461,7 +477,7 @@ public class RaftFSM implements FiniteStateMachine<RaftRequest> {
             FollowerRef ref = new FollowerRef();
             ref.communicationNode = node;
             ref.createTime = System.currentTimeMillis();
-            ref.nextIndex = lastLogIndex + 1;
+            ref.nextIndex = raftLogService.lastAvailableItem().getIndex();
             return ref;
         });
 
@@ -469,11 +485,11 @@ public class RaftFSM implements FiniteStateMachine<RaftRequest> {
             followerRef.lastAlive = System.currentTimeMillis();
 
             if (response.isSuccess()) {
-                followerRef.nextIndex += 1;
-                log.warn("do next log");
+                followerRef.nextIndex = response.getLastIndex() + 1;
+                log.warn("follower {} accept append nextIndex = {}", followerRef.communicationNode, followerRef.nextIndex);
             } else {
                 followerRef.nextIndex -= 1;
-                log.warn("follower deny append request");
+                log.warn("follower {} deny append request nextIndex = {}", followerRef.communicationNode, followerRef.nextIndex);
             }
         }
 

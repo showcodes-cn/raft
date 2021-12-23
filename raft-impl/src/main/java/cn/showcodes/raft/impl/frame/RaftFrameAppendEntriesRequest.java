@@ -4,7 +4,6 @@ import cn.showcodes.raft.RaftLog;
 import cn.showcodes.util.ByteSerializable;
 import lombok.Getter;
 import lombok.Setter;
-
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 

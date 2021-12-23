@@ -2,7 +2,6 @@ package cn.showcodes.raft.impl;
 
 import cn.showcodes.raft.RaftRequest;
 import cn.showcodes.raft.RaftRequestSupplier;
-
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 

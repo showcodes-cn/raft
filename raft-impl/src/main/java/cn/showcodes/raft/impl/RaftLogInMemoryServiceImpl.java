@@ -17,7 +17,7 @@ public class RaftLogInMemoryServiceImpl implements RaftLogService {
     @Override
     public RaftLog get(long index) {
         lock.writeLock().lock();
-        RaftLog logItem = data.get((int) index);
+        RaftLog logItem = data.size() > index ? data.get((int) index) : null;
         lock.writeLock().unlock();
         return logItem;
     }
@@ -63,4 +63,31 @@ public class RaftLogInMemoryServiceImpl implements RaftLogService {
     public long commitTo(long leaderCommit) {
         return commit(get(leaderCommit)).getIndex();
     }
+
+    @Override
+    public RaftLog lastAvailableItem() {
+        return data.peekLast();
+    }
+
+    @Override
+    public RaftLog lastCommitItem() {
+        return get(getCommitIndex());
+    }
+
+    @Override
+    public int removeTo(RaftLog raftLog) {
+        int total = 0;
+        while(true) {
+            RaftLog last = data.peekLast();
+            if (last.equals(raftLog)) {
+                break;
+            } else {
+                total++;
+                data.removeLast();
+            }
+        }
+        return total;
+    }
+
+
 }

@@ -5,6 +5,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.nio.ByteBuffer;
+import java.util.Objects;
 
 @Getter
 @Setter
@@ -39,4 +40,16 @@ public class RaftLog implements ByteSerializable {
         byteBuffer.get(bs);
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        RaftLog raftLog = (RaftLog) o;
+        return term == raftLog.term && index == raftLog.index && type == raftLog.type;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(term, index, type);
+    }
 }
